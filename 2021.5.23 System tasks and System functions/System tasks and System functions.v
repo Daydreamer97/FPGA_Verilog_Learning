@@ -3,18 +3,15 @@ module System_tasks_and_System_functions;
 	reg clk;
   reg rst_n;
   wire[3:0] led;
-//对比$monitor、$display和$write
+  reg a,b,c,d,e,f,g;
 
+//对比$monitor、$display和$write
 initial
 	begin
 		$display("display01:hello world") ;
 		$display("display02:hello world") ;
 		$write("write01:hello world") ;
 		$write("write02:hello world") ;
-	end
-
-initial
-	begin
 		$monitor("monitor01:clk=%b",clk) ;
 		clk = 1'b0;
 		rst_n = 1'b0;
