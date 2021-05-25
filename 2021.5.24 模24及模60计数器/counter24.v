@@ -1,5 +1,5 @@
 module counter24(CntH,CntL,nCR,EN,CP);
-	input CP,nCR,EN；
+	input CP,nCR,EN;
 	output reg[3:0] CntH,CntL;
 always @(posedge CP or negedge nCR)
 	begin
@@ -14,7 +14,7 @@ always @(posedge CP or negedge nCR)
 				CntH<=CntH;
 				CntL<=CntL+1'b1;
 			end
-		else if(CntH==9)
+		else if(CntL==9)
 			begin
 				CntH<=CntH+1'b1;
 				CntL<=4'b0000;
