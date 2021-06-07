@@ -1,3 +1,4 @@
+//master模块实现1个字节spi数据的读写（1个字节有8位数据）
 module spi_master
 (
 	input       sys_clk,	
@@ -12,8 +13,8 @@ module spi_master
 	input[15:0] clk_div,
 	input       wr_req,
 	output      wr_ack,
-	input[7:0]  data_in,
-	output[7:0] data_out
+	input[7:0]  data_in,//data_in：输入给spi_flash的数据
+	output[7:0] data_out//data_out：从spi_flash中输出的数据
 );
 localparam IDLE            = 0;
 localparam DCLK_EDGE       = 1;
@@ -27,14 +28,14 @@ reg[7:0]   MOSI_shift;
 reg[7:0]   MISO_shift;
 reg[2:0]   state;
 reg[2:0]   next_state;
-reg [15:0] clk_cnt;
+reg[15:0]  clk_cnt;
 reg[4:0]   clk_edge_cnt;
 
-assign MOSI = MOSI_shift[7];
-assign DCLK = DCLK_reg;
-assign data_out = MISO_shift;
-assign wr_ack = (state == ACK);
-assign nCS = nCS_ctrl;
+assign MOSI = MOSI_shift[7];//MOSI：spi串行数据输出。定义数据依MOSI_shift[7]内容，一位一位地输出
+assign DCLK = DCLK_reg;//输出一个模拟的spi时钟
+assign data_out = MISO_shift;//MISO：spi串行数据输入。data_out：从spi_flash中输出的数据
+assign wr_ack = (state == ACK);//写应答（处于ACK状态，则表示写应答信号有效，意味着完成了1个字节的写操作）
+assign nCS = nCS_ctrl;//低有效片选信号
 
 always @(posedge sys_clk or posedge rst)
 begin
@@ -58,6 +59,7 @@ begin
 				next_state <= IDLE;
 
 //以下实现了8个周期的SPI时钟
+
 		//DCLK空闲状态
 		DCLK_IDLE:
 			//half a SPI clock cycle produces a clock edge
@@ -73,6 +75,7 @@ begin
 			//如果还没有计满16个SPI边沿，在下一个sys_clk到来的时候，状态会跳转为“DCLK_IDLE”
 			else
 				next_state <= DCLK_IDLE;
+				
 //以上，两个状态机之间循环，计数16个SPI边沿，共计8个周期SPI时钟
 
 		//等待最后半个周期状态
@@ -102,7 +105,7 @@ begin
 	else if(state == IDLE)
 		DCLK_reg <= CPOL;
 	//处于“DCLK_EDGE”状态时，每个sys_clk上升沿时，都伴随着SPI时钟的跳转
-	//由于本案设定clk_div=0，所以每2个sys_clk上升沿才会有1个“DCLK_EDGE”状态，这就导致SPI时钟跳转1下需要2个sys_clk上升沿，即SPI时钟频率为sys_clk的四分之一
+	//由于本案设定clk_div=0，所以每2个sys_clk上升沿才会有1个“DCLK_EDGE”状态，这就导致SPI时钟跳转1下需要2个sys_clk上升沿。这就导致在clk_div=0的前提下，SPI时钟频率为sys_clk的四分之一
 	else if(state == DCLK_EDGE)
 		DCLK_reg <= ~DCLK_reg;
 end
@@ -117,7 +120,7 @@ begin
 	else
 		clk_cnt <= 16'd0;
 end
-//SPI时钟（上升沿）计数器
+//SPI时钟（边沿）计数器
 always @(posedge sys_clk or posedge rst)
 begin
 	if(rst)
@@ -129,32 +132,47 @@ begin
 	else if(state == IDLE)
 		clk_edge_cnt <= 5'd0;
 end
+/////以下为：往spi_flash进行的操作/////
+
 //往spi_flash写入数据（MOSI：串行数据输出）
 always @(posedge sys_clk or posedge rst)
 begin
 	if(rst)
 		MOSI_shift <= 8'd0;
+	//如果处于空闲状态且有写请求，那么将中间寄存器data_in中的数据存入MOSI_shift寄存器中，以便后续移位并一位一位地写入spi_flash中
 	else if(state == IDLE && wr_req)
 		MOSI_shift <= data_in;
-	//处于“DCLK_EDGE”状态，循环移位
+	//处于“DCLK_EDGE”状态，循环移位（每个SPI边沿）
 	else if(state == DCLK_EDGE)
-		if(CPHA == 1'b0 && clk_edge_cnt[0] == 1'b1)
-			MOSI_shift <= {MOSI_shift[6:0],MOSI_shift[7]};
-		else if(CPHA == 1'b1 && (clk_edge_cnt != 5'd0 && clk_edge_cnt[0] == 1'b0))
-			MOSI_shift <= {MOSI_shift[6:0],MOSI_shift[7]};
+		begin
+			if(CPHA == 1'b0 && clk_edge_cnt[0] == 1'b1)
+				MOSI_shift <= {MOSI_shift[6:0],MOSI_shift[7]};
+			//top模块已设定CPHA=1，则采用以下判定条件
+			//当SPI时钟边沿计数器不等于0（clk_edge_cnt != 5'd0）且计数器的末位为0（clk_edge_cnt[0] == 1'b0）时，MOSI数据整体左移（MOSI = MOSI_shift[7]，每个SPI时钟边沿到来的时候输出最高位的数据）
+			//SPI时钟边沿计数器末尾为0（clk_edge_cnt[0] == 1'b0）时发送数据，表示数据在第一个边沿发送（符合CPHA=1的规定）
+			else if(CPHA == 1'b1 && (clk_edge_cnt != 5'd0 && clk_edge_cnt[0] == 1'b0))
+				MOSI_shift <= {MOSI_shift[6:0],MOSI_shift[7]};
+		end
 end
 //从spi_flash读取数据（MISO：串行数据输入）
 always @(posedge sys_clk or posedge rst)
 begin
+	//重置，清空MISO_shift寄存器
 	if(rst)
 		MISO_shift <= 8'd0;
+	//如果处于空闲状态且有写请求，那么也清空MISO_shift寄存器
 	else if(state == IDLE && wr_req)
 		MISO_shift <= 8'h00;
 	//处于“DCLK_EDGE”状态，循环移位
 	else if(state == DCLK_EDGE)
-		if(CPHA == 1'b0 && clk_edge_cnt[0] == 1'b0)
-			MISO_shift <= {MISO_shift[6:0],MISO};
-		else if(CPHA == 1'b1 && (clk_edge_cnt[0] == 1'b1))
-			MISO_shift <= {MISO_shift[6:0],MISO};
+		begin
+			if(CPHA == 1'b0 && clk_edge_cnt[0] == 1'b0)
+				MISO_shift <= {MISO_shift[6:0],MISO};
+			//top模块已设定CPHA=1，则采用以下判定条件
+			//当SPI时钟边沿计数器的末位为1（clk_edge_cnt[0] == 1'b1）时，将MOSI数据整体左移，读取到的MISO数据放在MISO_shift寄存器的最低位
+			//SPI时钟边沿计数器末尾为1（clk_edge_cnt[0] == 1'b1）时读取接收到的数据，表示数据在第二个边沿采样接收（符合CPHA=1的规定）
+			else if(CPHA == 1'b1 && (clk_edge_cnt[0] == 1'b1))
+				MISO_shift <= {MISO_shift[6:0],MISO};
+		end
 end
 endmodule
