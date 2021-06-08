@@ -43,9 +43,10 @@ wire       flash_write_data_req;
 wire [7:0] flash_read_data_out;
 wire       flash_read_data_valid;
 
-//flash的读写字节大小定义
+//flash的读写字节大小定义，1个地址对应1个字节
 assign flash_read_size = 9'd1;
 assign flash_write_size = 9'd1;
+
 //调用按键消抖模块
 ax_debounce ax_debounce_m0
 (
@@ -102,7 +103,7 @@ begin
 	//状态跳转
 	else
 		case(state)
-			//空闲状态，计时器计时250ms（12_500_000*0.02us*10^-3=250ms）之后，跳转至READ状态
+			//空闲状态，等待一定时间之后再去读（计时器计时250ms（12_500_000*0.02us*10^-3=250ms）之后，跳转至READ状态）
 			S_IDLE:
 				begin
 					if(timer >= 32'd12_499_999)
@@ -158,7 +159,7 @@ begin
 			//读状态
 			S_READ:
 				begin
-					//如果读信号是有效的，则将读取到的数据（flash_read_data_out）放在read_data寄存器
+					//如果读信号是有效的，则将读取到的数据（flash_read_data_out）放在read_data寄存器缓存
 					if(flash_read_data_valid == 1'b1)
 						begin
 							read_data <= flash_read_data_out;
