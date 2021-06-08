@@ -35,7 +35,7 @@ wire[8:0]           size;
 wire                data_req;
 wire[7:0]           data_out;
 wire                data_valid;
-//调用ctrl模块，该模块直接对接flash
+//调用ctrl模块
 spi_flash_ctrl spi_flash_ctrl_m0(
 	.sys_clk                 ( sys_clk                      ),
 	.rst                     ( rst                          ),
@@ -92,7 +92,7 @@ spi_flash_cmd spi_flash_cmd_m0(
 	.send_data(send_data),
 	.data_recv(data_recv)
 );
-//SPI master controller,send a byte and return one at the same time
+//SPI master controller,send a byte and return one at the same time，该模块直接对接flash
 spi_master spi_master_m0(
 	.sys_clk(sys_clk),
 	.rst(rst),
@@ -101,8 +101,8 @@ spi_master spi_master_m0(
 	.MOSI(MOSI),
 	.MISO(MISO),
 	.clk_div(clk_div),
-	.CPOL(1'b1),
-	.CPHA(1'b1),
+	.CPOL(1'b1),//规定SPI时钟=1处于空闲状态，=0就是有效状态
+	.CPHA(1'b1),//规定数据发送在第1个边沿，数据采样在第2个边沿（先输出，后采样）
 	.nCS_ctrl(CS_reg),
 	.wr_req(wr_req),
 	.wr_ack(wr_ack),

@@ -13,7 +13,7 @@ module spi_master
 	input[15:0] clk_div,
 	input       wr_req,
 	output      wr_ack,
-	input[7:0]  data_in,//data_in：输入给spi_flash的数据
+	input[7:0]  data_in,//data_in：输入给spi_flash的数据，对接cmd模块的“send_data”
 	output[7:0] data_out//data_out：从spi_flash中输出的数据
 );
 localparam IDLE            = 0;
@@ -52,7 +52,7 @@ begin
 	case(state)
 		//空闲状态
 		IDLE:
-			//如果有写请求，则跳转至“DCLK_IDLE”状态
+			//如果有写请求（来自于spi_flash_cmd的写请求），则跳转至“DCLK_IDLE”状态
 			if(wr_req == 1'b1)
 				next_state <= DCLK_IDLE;
 			else
